@@ -1,0 +1,48 @@
+name: build-android
+on:
+  push:
+    branches:
+      - main
+      - master
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup repo
+        uses: actions/checkout@v2
+
+      - name: Setup Node
+        uses: actions/setup-node@v2
+        with:
+          node-version: 16.x
+
+      - name: Setup Expo and EAS
+        uses: expo/expo-github-action@v7
+        with:
+          expo-version: latest
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Install expect
+        run: sudo apt-get install expect
+
+      - name: Run initial build
+        uses: mathiasvr/command-output@v1
+        id: cmd
+        with:
+          run: |
+            yarn install --frozen-lockfile
+            expect ./script.exp
+
+      - name: The initial build has failed
+        if: ${{ failure() }}
+        run: |
+          curl -X POST https://api.draftbit.com/report-mobile-publishing-status -H "Accept: application/json" -H "Content-Type: application/json" -H "Authorization: Bearer draftbit-is-greatest-ever" -d '{"action":"ReportFailure","platform":"Android","appUuid":"VwdmXptc","userUuid":"0ZGof3Ai","error":"${{ toJSON(steps.cmd.outputs.stderr) }}"}'
+
+      - name: The initial build has succeeded
+        if: ${{ success() }}
+        run: |
+          curl -X POST https://api.draftbit.com/report-mobile-publishing-status -H "Accept: application/json" -H "Content-Type: application/json" -H "Authorization: Bearer draftbit-is-greatest-ever" -d '{"action":"ReportSuccess","platform":"Android","appUuid":"VwdmXptc","userUuid":"0ZGof3Ai","error":"${{ toJSON(steps.cmd.outputs.stderr) }}"}'
